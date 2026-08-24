@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { OLYMPUS_CONFIG } from '../../config/olympusConfig';
+import { CELESTIAL_THEME } from '../../config/olympusConfig';
 
-// Custom Sky Dome Shader with dawn/twilight celestial gradient
+// Rich dawn/twilight sky dome shader with multi-stop celestial horizon gradient
 const skyVertexShader = `
   varying vec3 vWorldPosition;
   void main() {
@@ -15,7 +15,9 @@ const skyVertexShader = `
 const skyFragmentShader = `
   uniform vec3 uTopColor;
   uniform vec3 uHorizonColor;
+  uniform vec3 uDawnAmber;
   uniform vec3 uSunColor;
+  uniform vec3 uSunHaloColor;
   uniform vec3 uSunPosition;
   varying vec3 vWorldPosition;
 
@@ -23,16 +25,24 @@ const skyFragmentShader = `
     vec3 point = normalize(vWorldPosition);
     float h = max(0.0, point.y);
     
-    // Sky gradient from horizon to zenith
-    vec3 sky = mix(uHorizonColor, uTopColor, pow(h, 0.45));
+    // Multi-stop horizon sky gradient
+    // Lower horizon: radiant dawn amber -> Mid-sky: mythological violet/rose -> Upper zenith: deep midnight
+    vec3 lowerSky = mix(uDawnAmber, uHorizonColor, smoothstep(0.0, 0.28, h));
+    vec3 sky = mix(lowerSky, uTopColor, smoothstep(0.18, 0.95, h));
 
-    // Sun glow disk & halo
+    // Shared Sun Glow Disk & Atmospheric Halo
     vec3 sunDir = normalize(uSunPosition);
     float sunDot = max(0.0, dot(point, sunDir));
-    float sunHalo = pow(sunDot, 16.0) * 0.4;
-    float sunCore = pow(sunDot, 128.0) * 1.5;
+    
+    // Broad atmospheric golden wash
+    float sunWash = pow(sunDot, 6.0) * 0.35;
+    // Radiant amber halo
+    float sunHalo = pow(sunDot, 24.0) * 0.75;
+    // Brilliant solar core
+    float sunCore = pow(sunDot, 180.0) * 2.2;
 
-    sky += uSunColor * (sunHalo + sunCore);
+    sky += uSunHaloColor * (sunWash + sunHalo);
+    sky += uSunColor * sunCore;
 
     gl_FragColor = vec4(sky, 1.0);
   }
@@ -40,20 +50,25 @@ const skyFragmentShader = `
 
 export default function Atmosphere() {
   const skyUniforms = useMemo(() => ({
-    uTopColor: { value: new THREE.Color('#030712') },       // Deep celestial midnight
-    uHorizonColor: { value: new THREE.Color('#2C1844') },   // Mythological dawn purple/amber
-    uSunColor: { value: new THREE.Color('#FDE047') },       // Radiant Olympian gold
-    uSunPosition: { value: new THREE.Vector3(...OLYMPUS_CONFIG.world.sunPosition) }
+    uTopColor: { value: new THREE.Color(CELESTIAL_THEME.sky.topColor) },
+    uHorizonColor: { value: new THREE.Color(CELESTIAL_THEME.sky.horizonColor) },
+    uDawnAmber: { value: new THREE.Color(CELESTIAL_THEME.sky.dawnAmber) },
+    uSunColor: { value: new THREE.Color(CELESTIAL_THEME.sun.color) },
+    uSunHaloColor: { value: new THREE.Color(CELESTIAL_THEME.sun.haloColor) },
+    uSunPosition: { value: new THREE.Vector3(...CELESTIAL_THEME.sun.position) }
   }), []);
 
   return (
     <>
-      {/* 1. Atmospheric Fog */}
-      <fogExp2 attach="fog" args={[OLYMPUS_CONFIG.world.fogColor, OLYMPUS_CONFIG.world.fogDensity]} />
+      {/* 1. Atmospheric Fog (density balanced to reveal horizon gradient) */}
+      <fogExp2
+        attach="fog"
+        args={[CELESTIAL_THEME.sky.fogColor, CELESTIAL_THEME.sky.fogDensity]}
+      />
 
-      {/* 2. Sky Dome Sphere */}
+      {/* 2. Panoramic Sky Dome Sphere */}
       <mesh scale={[-1, 1, 1]}>
-        <sphereGeometry args={[650, 32, 24]} />
+        <sphereGeometry args={[750, 36, 28]} />
         <shaderMaterial
           vertexShader={skyVertexShader}
           fragmentShader={skyFragmentShader}
@@ -63,38 +78,38 @@ export default function Atmosphere() {
         />
       </mesh>
 
-      {/* 3. Celestial Lighting */}
-      {/* Ambient Fill */}
-      <ambientLight color="#1E293B" intensity={0.8} />
+      {/* 3. Shared Celestial Lighting Rig */}
+      {/* Ambient sky fill */}
+      <ambientLight color="#1E293B" intensity={0.7} />
 
-      {/* Hemisphere Sky/Ground Light */}
+      {/* Hemisphere sky/ground radiant bounce */}
       <hemisphereLight
         color="#38BDF8"
         groundColor="#0B132B"
-        intensity={0.65}
+        intensity={0.6}
       />
 
       {/* Directional Golden Sun Light */}
       <directionalLight
-        position={OLYMPUS_CONFIG.world.sunPosition}
-        color="#FFEAA7"
-        intensity={2.2}
+        position={CELESTIAL_THEME.sun.position}
+        color={CELESTIAL_THEME.sun.color}
+        intensity={CELESTIAL_THEME.sun.intensity}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
         shadow-camera-near={10}
-        shadow-camera-far={400}
-        shadow-camera-left={-100}
-        shadow-camera-right={100}
-        shadow-camera-top={100}
-        shadow-camera-bottom={-100}
+        shadow-camera-far={450}
+        shadow-camera-left={-120}
+        shadow-camera-right={120}
+        shadow-camera-top={120}
+        shadow-camera-bottom={-120}
       />
 
-      {/* Subtle Counter Fill Light */}
+      {/* Counter Soft Light */}
       <directionalLight
-        position={[-50, 40, 50]}
+        position={[-60, 45, 60]}
         color="#38BDF8"
-        intensity={0.4}
+        intensity={0.35}
       />
     </>
   );
