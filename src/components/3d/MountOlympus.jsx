@@ -1,17 +1,16 @@
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { OLYMPUS_CONFIG } from '../../config/olympusConfig';
+import { OLYMPUS_CONFIG, CELESTIAL_THEME } from '../../config/olympusConfig';
 
 export default function MountOlympus() {
   const beaconRef = useRef(null);
   const ringRef = useRef(null);
-  const floatingIslandsRef = useRef([]);
 
-  // Generate stylized procedural mountain geometry with rocky ridges
+  // Generate stylized procedural mountain geometry with rocky ridges and crags
   const { mountainGeo, snowCapGeo } = useMemo(() => {
     // 1. Base Mountain Cone Geometry
-    const mGeo = new THREE.ConeGeometry(55, OLYMPUS_CONFIG.world.mountainHeight, 36, 24);
+    const mGeo = new THREE.ConeGeometry(58, OLYMPUS_CONFIG.world.mountainHeight, 36, 24);
     const pos = mGeo.attributes.position;
 
     // Displace vertices to create jagged ridges and natural mountain terraces
@@ -20,17 +19,15 @@ export default function MountOlympus() {
       const y = pos.getY(i);
       const z = pos.getZ(i);
 
-      // Height ratio: 0 at base, 1 at peak
       const hRatio = (y + OLYMPUS_CONFIG.world.mountainHeight / 2) / OLYMPUS_CONFIG.world.mountainHeight;
 
       if (hRatio < 0.92) {
-        // Multi-frequency noise displacement for rocky crags
         const angle = Math.atan2(z, x);
         const radius = Math.sqrt(x * x + z * z);
         
-        const ridge1 = Math.sin(angle * 5.0 + y * 0.1) * 4.5;
-        const ridge2 = Math.cos(angle * 9.0 - y * 0.15) * 2.2;
-        const crag = (Math.sin(x * 0.4) * Math.cos(z * 0.4)) * 2.0;
+        const ridge1 = Math.sin(angle * 5.0 + y * 0.1) * 4.8;
+        const ridge2 = Math.cos(angle * 9.0 - y * 0.15) * 2.4;
+        const crag = (Math.sin(x * 0.4) * Math.cos(z * 0.4)) * 2.2;
 
         const displacement = (ridge1 + ridge2 + crag) * (1.0 - hRatio * 0.7);
         const newRadius = Math.max(0.5, radius + displacement);
@@ -42,131 +39,137 @@ export default function MountOlympus() {
     mGeo.computeVertexNormals();
 
     // 2. Snowy Golden Cap at Summit
-    const sGeo = new THREE.ConeGeometry(18, 26, 24, 8);
+    const sGeo = new THREE.ConeGeometry(19, 26, 24, 8);
     sGeo.computeVertexNormals();
 
     return { mountainGeo: mGeo, snowCapGeo: sGeo };
   }, []);
 
-  // Floating mystical rock islands around the peak
+  // Floating mystical rock islands arranged with distinct depth layering (Z: -50 to -82)
   const floatingIslands = useMemo(() => {
     return [
-      { pos: [-24, 75, -45], scale: [4, 6, 4], rotSpeed: 0.2 },
-      { pos: [26, 78, -48], scale: [5, 7, 5], rotSpeed: -0.15 },
-      { pos: [-18, 88, -65], scale: [3.5, 5, 3.5], rotSpeed: 0.25 },
-      { pos: [20, 86, -62], scale: [4, 5.5, 4], rotSpeed: -0.18 }
+      { pos: [-28, 72, -50], scale: [4.2, 6.5, 4.2] }, // Fore-left
+      { pos: [30, 75, -55], scale: [4.8, 7.2, 4.8] },  // Fore-right
+      { pos: [-22, 86, -78], scale: [3.6, 5.2, 3.6] }, // Background-left
+      { pos: [24, 84, -82], scale: [4.0, 5.8, 4.0] }   // Background-right
     ];
   }, []);
 
   useFrame((state, delta) => {
-    // Subtle breathing pulse for divine peak beacon
+    // Subtle rotation & breathing pulse for divine peak beacon
     if (beaconRef.current) {
       beaconRef.current.rotation.y += delta * 0.3;
     }
     if (ringRef.current) {
-      ringRef.current.rotation.z -= delta * 0.2;
-      ringRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
+      ringRef.current.rotation.z -= delta * 0.18;
+      ringRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.4) * 0.08;
     }
   });
 
   const [mx, my, mz] = OLYMPUS_CONFIG.world.mountainPosition;
-  const summitY = my + OLYMPUS_CONFIG.world.mountainHeight * 0.48;
+  const [px, py, pz] = OLYMPUS_CONFIG.world.sanctuaryPlatform;
+  const [rx, ry, rz] = OLYMPUS_CONFIG.world.torusHaloPosition;
+  const [bx, by, bz] = OLYMPUS_CONFIG.world.beaconLightPosition;
 
   return (
-    <group position={[mx, my + OLYMPUS_CONFIG.world.mountainHeight / 2 - 5, mz]}>
+    <group>
       {/* 1. Main Rocky Mountain Body */}
-      <mesh geometry={mountainGeo} receiveShadow castShadow>
-        <meshStandardMaterial
-          color="#1E293B"
-          roughness={0.88}
-          metalness={0.12}
-          flatShading={true}
-        />
-      </mesh>
-
-      {/* 2. Snow / Golden Summit Cap */}
-      <mesh
-        geometry={snowCapGeo}
-        position={[0, OLYMPUS_CONFIG.world.mountainHeight * 0.38, 0]}
-        receiveShadow
-      >
-        <meshStandardMaterial
-          color="#E2E8F0"
-          emissive="#FDE047"
-          emissiveIntensity={0.15}
-          roughness={0.4}
-          metalness={0.3}
-          flatShading={true}
-        />
-      </mesh>
-
-      {/* 3. Golden Summit Sanctuary Platform (Throne Plateau) */}
-      <mesh position={[0, summitY - 2, 0]} receiveShadow>
-        <cylinderGeometry args={[16, 20, 4, 32]} />
-        <meshStandardMaterial
-          color="#D97706"
-          roughness={0.3}
-          metalness={0.6}
-          emissive="#B45309"
-          emissiveIntensity={0.25}
-        />
-      </mesh>
-
-      {/* Gilded Temple Ring Rim */}
-      <mesh position={[0, summitY + 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[13.5, 15.5, 36]} />
-        <meshStandardMaterial
-          color="#FDE047"
-          roughness={0.2}
-          metalness={0.85}
-          emissive="#F59E0B"
-          emissiveIntensity={0.5}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* 4. Divine Peak Beacon & Light Column */}
-      <group ref={beaconRef} position={[0, summitY + 12, 0]}>
-        {/* Glowing Energy Pillar */}
-        <mesh>
-          <cylinderGeometry args={[1.2, 3.5, 38, 16, 1, true]} />
-          <meshBasicMaterial
-            color="#FDE047"
-            transparent
-            opacity={0.35}
-            side={THREE.DoubleSide}
+      <group position={[mx, my + OLYMPUS_CONFIG.world.mountainHeight / 2 - 4, mz]}>
+        <mesh geometry={mountainGeo} receiveShadow castShadow>
+          <meshStandardMaterial
+            color="#1E293B"
+            roughness={0.88}
+            metalness={0.12}
+            flatShading={true}
           />
         </mesh>
 
-        {/* Outer Aura Beam */}
-        <mesh>
-          <cylinderGeometry args={[4.5, 9.0, 48, 16, 1, true]} />
-          <meshBasicMaterial
-            color="#F59E0B"
-            transparent
-            opacity={0.12}
+        {/* Snow / Golden Summit Cap */}
+        <mesh
+          geometry={snowCapGeo}
+          position={[0, OLYMPUS_CONFIG.world.mountainHeight * 0.38, 0]}
+          receiveShadow
+        >
+          <meshStandardMaterial
+            color="#E2E8F0"
+            emissive={CELESTIAL_THEME.sun.color}
+            emissiveIntensity={0.18}
+            roughness={0.4}
+            metalness={0.3}
+            flatShading={true}
+          />
+        </mesh>
+      </group>
+
+      {/* 2. Golden Summit Sanctuary Platform (Positioned at Z: -68) */}
+      <group position={[px, py, pz]}>
+        <mesh position={[0, -1.8, 0]} receiveShadow>
+          <cylinderGeometry args={[17, 21, 3.6, 32]} />
+          <meshStandardMaterial
+            color="#D97706"
+            roughness={0.3}
+            metalness={0.65}
+            emissive="#B45309"
+            emissiveIntensity={0.25}
+          />
+        </mesh>
+
+        {/* Gilded Temple Ring Rim */}
+        <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[14.2, 16.5, 36]} />
+          <meshStandardMaterial
+            color={CELESTIAL_THEME.sun.color}
+            roughness={0.2}
+            metalness={0.85}
+            emissive={CELESTIAL_THEME.sun.haloColor}
+            emissiveIntensity={0.5}
             side={THREE.DoubleSide}
           />
         </mesh>
       </group>
 
-      {/* 5. Celestial Ring hovering above the peak */}
+      {/* 3. Divine Peak Light Shaft & Solar Column (Uses shared CELESTIAL_THEME uniforms) */}
+      <group ref={beaconRef} position={[bx, by + 16, bz]}>
+        {/* Inner brilliant core beam */}
+        <mesh>
+          <cylinderGeometry args={[1.2, 3.8, 42, 16, 1, true]} />
+          <meshBasicMaterial
+            color={CELESTIAL_THEME.sun.color}
+            transparent
+            opacity={CELESTIAL_THEME.sun.shaftOpacity}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+
+        {/* Outer warm amber aura shaft matching Atmosphere sun glow */}
+        <mesh>
+          <cylinderGeometry args={[4.8, 9.5, 52, 16, 1, true]} />
+          <meshBasicMaterial
+            color={CELESTIAL_THEME.sun.haloColor}
+            transparent
+            opacity={CELESTIAL_THEME.sun.shaftAuraOpacity}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
+
+      {/* 4. Celestial Halo Torus Ring (Offset backward in Z: -78, Y: 110 for distinct depth separation) */}
       <mesh
         ref={ringRef}
-        position={[0, summitY + 16, 0]}
+        position={[rx, ry, rz]}
         rotation={[Math.PI / 2.3, 0, 0]}
       >
-        <torusGeometry args={[8.5, 0.25, 16, 64]} />
+        <torusGeometry args={[9.5, 0.28, 16, 64]} />
         <meshStandardMaterial
-          color="#FDE047"
-          emissive="#F59E0B"
-          emissiveIntensity={0.8}
+          color={CELESTIAL_THEME.sun.color}
+          emissive={CELESTIAL_THEME.sun.haloColor}
+          emissiveIntensity={0.85}
           roughness={0.2}
           metalness={0.9}
         />
       </mesh>
 
-      {/* 6. Floating Rock Islands flanking the peak */}
+      {/* 5. Floating Rock Islands (Distinctly layered in depth) */}
       {floatingIslands.map((island, idx) => (
         <mesh
           key={idx}
@@ -183,12 +186,12 @@ export default function MountOlympus() {
         </mesh>
       ))}
 
-      {/* 7. Peak Point Light illuminating the summit */}
+      {/* 6. Shared Summit Point Light */}
       <pointLight
-        position={[0, summitY + 8, 0]}
-        color="#FDE047"
-        intensity={80}
-        distance={60}
+        position={[bx, by + 10, bz]}
+        color={CELESTIAL_THEME.sun.color}
+        intensity={90}
+        distance={70}
         decay={2}
       />
     </group>
