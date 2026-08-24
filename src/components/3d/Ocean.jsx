@@ -1,7 +1,7 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { OLYMPUS_CONFIG } from '../../config/olympusConfig';
+import { OLYMPUS_CONFIG, CELESTIAL_THEME } from '../../config/olympusConfig';
 
 // Custom Ocean GLSL Shaders
 const oceanVertexShader = `
@@ -120,12 +120,12 @@ export default function Ocean() {
     uTime: { value: 0 },
     uWaveSpeed: { value: 0.9 },
     uWaveHeight: { value: 0.9 },
-    uDeepColor: { value: new THREE.Color('#061426') },
-    uShallowColor: { value: new THREE.Color('#0D5C75') },
-    uSunColor: { value: new THREE.Color('#FFE4A0') },
-    uSunPosition: { value: new THREE.Vector3(...OLYMPUS_CONFIG.world.sunPosition) },
-    uFogColor: { value: new THREE.Color(OLYMPUS_CONFIG.world.fogColor) },
-    uFogDensity: { value: OLYMPUS_CONFIG.world.fogDensity }
+    uDeepColor: { value: new THREE.Color(CELESTIAL_THEME.ocean.deepColor) },
+    uShallowColor: { value: new THREE.Color(CELESTIAL_THEME.ocean.shallowColor) },
+    uSunColor: { value: new THREE.Color(CELESTIAL_THEME.sun.color) },
+    uSunPosition: { value: new THREE.Vector3(...CELESTIAL_THEME.sun.position) },
+    uFogColor: { value: new THREE.Color(CELESTIAL_THEME.sky.fogColor) },
+    uFogDensity: { value: CELESTIAL_THEME.sky.fogDensity }
   }), []);
 
   useFrame((_, delta) => {
