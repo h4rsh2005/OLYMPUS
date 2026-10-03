@@ -9,6 +9,8 @@ import CloudLayer from './CloudLayer';
 import BackgroundMountains from './BackgroundMountains';
 import Vegetation from './Vegetation';
 import Jormungandr from './Jormungandr';
+import GreekGateway from './GreekGateway';
+import GreekFloatingIslands from './GreekFloatingIslands';
 import DivineSanctuaryLife from './DivineSanctuaryLife';
 import ThronePlaceholders from './ThronePlaceholders';
 import FlythroughController from './FlythroughController';
@@ -56,7 +58,9 @@ export default function FlythroughScene({ onResetToLoading }) {
         <Atmosphere />
         <Ocean />
         <BackgroundMountains />
+        <GreekGateway />
         <MountOlympus />
+        <GreekFloatingIslands />
         <Jormungandr />
         <Vegetation />
         <CloudLayer />

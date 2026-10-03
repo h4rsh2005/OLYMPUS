@@ -166,15 +166,6 @@ export default function MountOlympus() {
     return list;
   }, []);
 
-  // Floating mystical rock islands
-  const floatingIslands = useMemo(() => {
-    return [
-      { pos: [-32, 68, -48], scale: [5.2, 7.8, 5.2], rot: [0.2, 0.4, 0] },
-      { pos: [34, 72, -54], scale: [5.8, 8.5, 5.8], rot: [-0.1, 0.8, 0.1] },
-      { pos: [-24, 88, -82], scale: [4.2, 6.2, 4.2], rot: [0.3, -0.5, 0] },
-      { pos: [26, 85, -86], scale: [4.8, 6.8, 4.8], rot: [-0.2, 0.6, -0.1] }
-    ];
-  }, []);
 
   useFrame((state, delta) => {
     if (beaconRef.current) {
@@ -334,27 +325,6 @@ export default function MountOlympus() {
           metalness={0.95}
         />
       </mesh>
-
-      {/* 5. Floating Mystical Rock Islands */}
-      {floatingIslands.map((island, idx) => (
-        <mesh
-          key={idx}
-          position={island.pos}
-          scale={island.scale}
-          rotation={island.rot}
-          castShadow
-          receiveShadow
-        >
-          <dodecahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial
-            map={rockTexture}
-            color="#263445"
-            roughness={0.88}
-            metalness={0.15}
-            flatShading={true}
-          />
-        </mesh>
-      ))}
 
       {/* 6. Summit Divine Point Light */}
       <pointLight

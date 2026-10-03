@@ -312,3 +312,140 @@ export function createSunFlareTexture(size = 256) {
   texture.needsUpdate = true;
   return texture;
 }
+
+/**
+ * 6. Ancient Hammered Olympian Gold Texture (256x256)
+ */
+export function createGoldLeafTexture(size = 256) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(size, size);
+  const data = imgData.data;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const nx = (x / size) * 8.0;
+      const ny = (y / size) * 8.0;
+
+      const hammer = noiseGen.fbm(nx * 2, ny * 2, 4, 0.6);
+      const sheen = Math.sin(nx * 1.5 + ny * 1.2) * 0.15;
+
+      // Rich Olympian Gold: 245, 185, 45 with subtle variations
+      const r = Math.min(255, Math.max(180, Math.floor(235 + hammer * 35 + sheen * 40)));
+      const g = Math.min(240, Math.max(130, Math.floor(175 + hammer * 30 + sheen * 35)));
+      const b = Math.min(100, Math.max(20, Math.floor(40 + hammer * 25 + sheen * 20)));
+
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * 7. Authentic Greek Key (Meander) Frieze Texture (512x128)
+ */
+export function createGreekMeanderTexture(width = 512, height = 128) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  // Background Pentelic marble or deep navy
+  ctx.fillStyle = '#101628';
+  ctx.fillRect(0, 0, width, height);
+
+  // Borders top and bottom
+  ctx.strokeStyle = '#FDE047';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, 8);
+  ctx.lineTo(width, 8);
+  ctx.moveTo(0, height - 8);
+  ctx.lineTo(width, height - 8);
+  ctx.stroke();
+
+  // Draw repeating Greek Key units
+  const unitWidth = 64;
+  const units = width / unitWidth;
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'miter';
+
+  for (let i = 0; i < units; i++) {
+    const x = i * unitWidth;
+    ctx.strokeStyle = '#F59E0B';
+    ctx.beginPath();
+    ctx.moveTo(x + 4, height - 18);
+    ctx.lineTo(x + unitWidth - 8, height - 18);
+    ctx.lineTo(x + unitWidth - 8, 20);
+    ctx.lineTo(x + 16, 20);
+    ctx.lineTo(x + 16, height - 32);
+    ctx.lineTo(x + unitWidth - 24, height - 32);
+    ctx.lineTo(x + unitWidth - 24, 34);
+    ctx.lineTo(x + 30, 34);
+    ctx.stroke();
+
+    // Golden inner highlight
+    ctx.strokeStyle = '#FEF08A';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineWidth = 5;
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.set(4, 1);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * 8. Cascading Waterfall Texture (256x512)
+ */
+export function createWaterfallTexture(width = 256, height = 512) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(width, height);
+  const data = imgData.data;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const nx = (x / width) * 4.0;
+      const ny = (y / height) * 24.0; // intense vertical elongation
+
+      const streak = noiseGen.fbm(nx * 3.0, ny * 0.8, 3, 0.6);
+      const foam = noiseGen.noise2D(nx * 12.0, ny * 3.0);
+      const alpha = Math.min(1.0, Math.max(0.2, streak * 0.7 + foam * 0.35 + 0.3));
+
+      // Shimmering crystalline Olympian water & frothy white crests
+      data[idx] = Math.floor(190 + foam * 65);
+      data[idx + 1] = Math.floor(230 + foam * 25);
+      data[idx + 2] = 255;
+      data[idx + 3] = Math.floor(alpha * 220);
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
