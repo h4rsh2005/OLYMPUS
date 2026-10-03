@@ -2,98 +2,134 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { OLYMPUS_CONFIG } from '../../config/olympusConfig';
-
-// High-resolution procedural soft Gaussian radial cloud texture
-function createProceduralCloudTexture() {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  const centerX = size / 2;
-  const centerY = size / 2;
-  const radius = size / 2;
-
-  const grad = ctx.createRadialGradient(
-    centerX, centerY, 2,
-    centerX, centerY, radius
-  );
-  
-  // Smooth Gaussian alpha falloff
-  grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.85)');
-  grad.addColorStop(0.2, 'rgba(248, 250, 255, 0.65)');
-  grad.addColorStop(0.45, 'rgba(235, 242, 255, 0.35)');
-  grad.addColorStop(0.72, 'rgba(215, 228, 250, 0.12)');
-  grad.addColorStop(0.92, 'rgba(200, 218, 245, 0.02)');
-  grad.addColorStop(1.0, 'rgba(195, 212, 240, 0.0)');
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.generateMipmaps = true;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.needsUpdate = true;
-  return texture;
-}
+import { createRealisticCloudTexture } from '../../utils/proceduralTextures';
 
 export default function CloudLayer() {
-  const groupRef = useRef(null);
-  const cloudTexture = useMemo(() => createProceduralCloudTexture(), []);
+  const midCloudsRef = useRef(null);
+  const lowMistRef = useRef(null);
+  const highCloudsRef = useRef(null);
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const cloudCount = isMobile ? 36 : 68;
+  const cloudTexture = useMemo(() => createRealisticCloudTexture(256), []);
 
-  const clouds = useMemo(() => {
-    const arr = [];
-    const [mx, , mz] = OLYMPUS_CONFIG.world.mountainPosition;
+  const [mx, , mz] = OLYMPUS_CONFIG.world.mountainPosition;
+
+  // 1. Sea Mist Layer (Drifting low above the Aegean waters)
+  const lowMist = useMemo(() => {
+    const list = [];
+    const count = 32;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.3;
+      const radius = 55 + Math.random() * 75;
+      const alt = 2.5 + Math.random() * 8.0;
+      list.push({
+        pos: [mx + Math.cos(angle) * radius, alt, mz + Math.sin(angle) * radius],
+        scale: [45 + Math.random() * 35, 12 + Math.random() * 10, 1],
+        opacity: 0.16 + Math.random() * 0.14
+      });
+    }
+    return list;
+  }, [mx, mz]);
+
+  // 2. Mid-Mountain Cloud Sea (The sacred mists of Mount Olympus)
+  const midClouds = useMemo(() => {
+    const list = [];
+    const count = 55;
     const baseAlt = OLYMPUS_CONFIG.world.cloudLayerAltitude;
 
-    for (let i = 0; i < cloudCount; i++) {
-      const angle = (i / cloudCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
-      const radius = 34 + Math.random() * 44;
-      const altOffset = (Math.random() - 0.5) * 28;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const radius = 38 + Math.random() * 52;
+      const altOffset = (Math.random() - 0.5) * 22;
 
-      arr.push({
-        position: [
+      // Color variation: Sunlit golden vs misty lilac
+      const isSunlit = Math.cos(angle - 0.8) > 0.1;
+
+      list.push({
+        pos: [
           mx + Math.cos(angle) * radius,
           baseAlt + altOffset,
           mz + Math.sin(angle) * radius
         ],
-        scale: 26 + Math.random() * 28,
-        opacity: 0.32 + Math.random() * 0.28,
-        isGolden: i % 3 === 0
+        scale: [38 + Math.random() * 32, 22 + Math.random() * 18, 1],
+        opacity: 0.28 + Math.random() * 0.22,
+        color: isSunlit ? '#FEF08A' : '#F1F5F9'
       });
     }
-    return arr;
-  }, [cloudCount]);
+    return list;
+  }, [mx, mz]);
+
+  // 3. High-Altitude Golden Cirrus
+  const highClouds = useMemo(() => {
+    const list = [];
+    const count = 20;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const radius = 80 + Math.random() * 90;
+      list.push({
+        pos: [mx + Math.cos(angle) * radius, 115 + Math.random() * 25, mz + Math.sin(angle) * radius],
+        scale: [70 + Math.random() * 50, 24 + Math.random() * 16, 1],
+        opacity: 0.18 + Math.random() * 0.12
+      });
+    }
+    return list;
+  }, [mx, mz]);
 
   useFrame((_, delta) => {
-    if (groupRef.current) {
-      // Gentle orbital cloud drift around Mount Olympus
-      groupRef.current.rotation.y += delta * 0.022;
-    }
+    // Differing drift speeds create atmospheric parallax depth
+    if (midCloudsRef.current) midCloudsRef.current.rotation.y += delta * 0.016;
+    if (lowMistRef.current) lowMistRef.current.rotation.y += delta * 0.008;
+    if (highCloudsRef.current) highCloudsRef.current.rotation.y -= delta * 0.012;
   });
 
   return (
-    <group ref={groupRef}>
-      {clouds.map((cloud, i) => (
-        <sprite
-          key={i}
-          position={cloud.position}
-          scale={[cloud.scale, cloud.scale * 0.6, 1]}
-        >
-          <spriteMaterial
-            map={cloudTexture}
-            transparent
-            opacity={cloud.opacity}
-            depthWrite={false}
-            blending={THREE.NormalBlending}
-            color={cloud.isGolden ? "#FDE047" : "#FFFFFF"}
-          />
-        </sprite>
-      ))}
+    <group>
+      {/* 1. Low Sea Mist */}
+      <group ref={lowMistRef}>
+        {lowMist.map((c, i) => (
+          <sprite key={`low-${i}`} position={c.pos} scale={c.scale}>
+            <spriteMaterial
+              map={cloudTexture}
+              transparent
+              opacity={c.opacity}
+              depthWrite={false}
+              blending={THREE.NormalBlending}
+              color="#CBD5E1"
+            />
+          </sprite>
+        ))}
+      </group>
+
+      {/* 2. Mid Mountain Cloud Sea */}
+      <group ref={midCloudsRef}>
+        {midClouds.map((c, i) => (
+          <sprite key={`mid-${i}`} position={c.pos} scale={c.scale}>
+            <spriteMaterial
+              map={cloudTexture}
+              transparent
+              opacity={c.opacity}
+              depthWrite={false}
+              blending={THREE.NormalBlending}
+              color={c.color}
+            />
+          </sprite>
+        ))}
+      </group>
+
+      {/* 3. High Golden Cirrus Clouds */}
+      <group ref={highCloudsRef}>
+        {highClouds.map((c, i) => (
+          <sprite key={`high-${i}`} position={c.pos} scale={c.scale}>
+            <spriteMaterial
+              map={cloudTexture}
+              transparent
+              opacity={c.opacity}
+              depthWrite={false}
+              blending={THREE.NormalBlending}
+              color="#FDE047"
+            />
+          </sprite>
+        ))}
+      </group>
     </group>
   );
 }

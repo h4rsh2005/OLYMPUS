@@ -1,16 +1,22 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { OLYMPUS_CONFIG } from '../../config/olympusConfig';
 
-export default function FlythroughController({ onComplete, isReplaying = false }) {
+export default function FlythroughController({
+  onComplete,
+  isReplaying = false,
+  freeControlsEnabled = false,
+  onFreeControlsToggle
+}) {
   const { camera } = useThree();
   const timelineRef = useRef(null);
-  
-  // Progress tracker object animated by GSAP
+  const controlsRef = useRef(null);
+
   const animProgress = useRef({ t: 0 });
-  const hasCompleted = useRef(false);
+  const [isDone, setIsDone] = useState(false);
 
   // 1. Build CatmullRomCurve3 for camera path and target look-at points
   const { pathCurve, targetCurve } = useMemo(() => {
@@ -30,9 +36,8 @@ export default function FlythroughController({ onComplete, isReplaying = false }
   // 2. Launch GSAP flythrough timeline
   useEffect(() => {
     animProgress.current.t = 0;
-    hasCompleted.current = false;
+    setIsDone(false);
 
-    // Set initial camera position & lookAt
     const initialPos = pathCurve.getPointAt(0);
     const initialTarget = targetCurve.getPointAt(0);
     camera.position.copy(initialPos);
@@ -45,10 +50,9 @@ export default function FlythroughController({ onComplete, isReplaying = false }
     }
 
     const tl = gsap.timeline({
-      delay: 0.2,
+      delay: 0.1,
       onComplete: () => {
-        hasCompleted.current = true;
-        console.log("flythrough complete");
+        setIsDone(true);
         if (onComplete) onComplete();
       }
     });
@@ -66,37 +70,45 @@ export default function FlythroughController({ onComplete, isReplaying = false }
     };
   }, [camera, pathCurve, targetCurve, onComplete, isReplaying]);
 
-  // 3. R3F useFrame 60-120fps smooth update loop
+  // 3. Frame update: Flythrough vs Free Orbit
   useFrame((state) => {
-    const t = Math.max(0, Math.min(1, animProgress.current.t));
+    const t = animProgress.current.t;
 
-    // Sample current point and target from curves
-    const currentPoint = pathCurve.getPointAt(t);
-    const currentTarget = targetCurve.getPointAt(t);
-
+    // While flythrough timeline is actively traveling (< 1)
     if (t < 1) {
-      // Dynamic FOV: Expands from 50 -> 64 at mid-flight for drone acceleration feel, then returns to 50
+      const currentPoint = pathCurve.getPointAt(t);
+      const currentTarget = targetCurve.getPointAt(t);
+
+      // Dynamic FOV for acceleration feel
       const fovElevation = Math.sin(t * Math.PI) * (OLYMPUS_CONFIG.flythrough.maxFOV - OLYMPUS_CONFIG.flythrough.baseFOV);
       camera.fov = OLYMPUS_CONFIG.flythrough.baseFOV + fovElevation;
       camera.updateProjectionMatrix();
 
-      // Update camera position & orientation
       camera.position.copy(currentPoint);
-      camera.lookAt(currentTarget);
-    } else {
-      // Idle float & subtle breathing motion when hovering at the summit
-      const time = state.clock.elapsedTime;
-      const hoverY = Math.sin(time * 0.8) * 0.35;
-      const hoverX = Math.cos(time * 0.6) * 0.25;
-
-      camera.position.set(
-        currentPoint.x + hoverX,
-        currentPoint.y + hoverY,
-        currentPoint.z
-      );
       camera.lookAt(currentTarget);
     }
   });
 
-  return null;
+  // Target sanctuary platform coordinates for OrbitControls
+  const [, py, pz] = OLYMPUS_CONFIG.world.sanctuaryPlatform;
+
+  // Once flythrough is complete (or if user requested free controls), enable OrbitControls for full 360 drag
+  return (
+    <>
+      <OrbitControls
+        ref={controlsRef}
+        enabled={isDone || freeControlsEnabled}
+        enableDamping={true}
+        dampingFactor={0.06}
+        rotateSpeed={0.7}
+        zoomSpeed={0.85}
+        panSpeed={0.6}
+        minDistance={6}
+        maxDistance={280}
+        maxPolarAngle={Math.PI / 2 - 0.02} // Do not clip below water/ground
+        minPolarAngle={0.08}
+        target={[0, py + 1.5, pz]}
+      />
+    </>
+  );
 }
