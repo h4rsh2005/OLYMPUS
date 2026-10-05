@@ -4,32 +4,33 @@
  */
 
 export const CELESTIAL_THEME = {
-  // Shared Sun & Light Shaft Parameters (shared by Atmosphere.jsx and MountOlympus.jsx)
+  // Shared Sun & Light Parameters (Refined, natural celestial sunlight)
   sun: {
-    position: [40, 120, -120],
-    color: "#FDE047",           // Primary golden sun
-    colorHex: 0xFDE047,
-    haloColor: "#F59E0B",       // Warm amber halo
-    haloColorHex: 0xF59E0B,
-    intensity: 2.4,
-    shaftOpacity: 0.38,
-    shaftAuraOpacity: 0.16,
+    position: [45, 125, -120],
+    color: "#FFF6E5",           // Natural warm celestial sunlight (not harsh yellow)
+    colorHex: 0xFFF6E5,
+    haloColor: "#FDE68A",       // Soft golden dawn halo
+    haloColorHex: 0xFDE68A,
+    skylightColor: "#7DD3FC",   // Ambient celestial blue skylight bounce
+    intensity: 2.1,
+    shaftOpacity: 0.28,
+    shaftAuraOpacity: 0.12,
   },
 
-  // Shared Sky & Fog
+  // Atmospheric Sky & Depth Fog
   sky: {
-    topColor: "#030612",        // Deep celestial midnight
-    horizonColor: "#35154E",    // Mythological dawn violet/magenta
-    dawnAmber: "#D97706",       // Radiant horizon gold
-    fogColor: "#0A1324",
-    fogDensity: 0.0042          // Balanced fog to reveal horizon gradient
+    topColor: "#020614",        // Deep Greek zenith sapphire midnight
+    horizonColor: "#2A1A3A",    // Ethereal mythological dawn violet
+    dawnAmber: "#D48B38",       // Subtle horizon dawn warmth
+    fogColor: "#0C1422",        // Harmonized deep atmospheric mist
+    fogDensity: 0.0036          // Clear enough to read Olympus silhouette, deep enough for scale
   },
 
-  // Ocean Colors
+  // Aegean Sea Colors
   ocean: {
-    deepColor: "#051324",
-    shallowColor: "#0C5A72",
-    specularColor: "#FFEAA7"
+    deepColor: "#03152B",
+    shallowColor: "#14B8A6",
+    specularColor: "#FFF1C2"
   }
 };
 
