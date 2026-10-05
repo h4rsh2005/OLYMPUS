@@ -24,7 +24,7 @@ export default function CloudLayer() {
       list.push({
         pos: [mx + Math.cos(angle) * radius, alt, mz + Math.sin(angle) * radius],
         scale: [45 + Math.random() * 35, 12 + Math.random() * 10, 1],
-        opacity: 0.16 + Math.random() * 0.14
+        opacity: 0.14 + Math.random() * 0.12
       });
     }
     return list;
@@ -41,7 +41,7 @@ export default function CloudLayer() {
       const radius = 38 + Math.random() * 52;
       const altOffset = (Math.random() - 0.5) * 22;
 
-      // Color variation: Sunlit golden vs misty lilac
+      // Color variation: Sunlit warm dawn ivory vs cool mountain slate
       const isSunlit = Math.cos(angle - 0.8) > 0.1;
 
       list.push({
@@ -51,34 +51,34 @@ export default function CloudLayer() {
           mz + Math.sin(angle) * radius
         ],
         scale: [38 + Math.random() * 32, 22 + Math.random() * 18, 1],
-        opacity: 0.28 + Math.random() * 0.22,
-        color: isSunlit ? '#FEF08A' : '#F1F5F9'
+        opacity: 0.22 + Math.random() * 0.18,
+        color: isSunlit ? '#FFFBEB' : '#F1F5F9'
       });
     }
     return list;
   }, [mx, mz]);
 
-  // 3. High-Altitude Golden Cirrus
+  // 3. High-Altitude Celestial Cirrus
   const highClouds = useMemo(() => {
     const list = [];
-    const count = 20;
+    const count = 22;
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2;
       const radius = 80 + Math.random() * 90;
       list.push({
         pos: [mx + Math.cos(angle) * radius, 115 + Math.random() * 25, mz + Math.sin(angle) * radius],
         scale: [70 + Math.random() * 50, 24 + Math.random() * 16, 1],
-        opacity: 0.18 + Math.random() * 0.12
+        opacity: 0.15 + Math.random() * 0.1
       });
     }
     return list;
   }, [mx, mz]);
 
   useFrame((_, delta) => {
-    // Differing drift speeds create atmospheric parallax depth
-    if (midCloudsRef.current) midCloudsRef.current.rotation.y += delta * 0.016;
-    if (lowMistRef.current) lowMistRef.current.rotation.y += delta * 0.008;
-    if (highCloudsRef.current) highCloudsRef.current.rotation.y -= delta * 0.012;
+    // Layered drift speeds create authentic atmospheric parallax depth
+    if (midCloudsRef.current) midCloudsRef.current.rotation.y += delta * 0.014;
+    if (lowMistRef.current) lowMistRef.current.rotation.y += delta * 0.007;
+    if (highCloudsRef.current) highCloudsRef.current.rotation.y -= delta * 0.01;
   });
 
   return (
@@ -115,7 +115,7 @@ export default function CloudLayer() {
         ))}
       </group>
 
-      {/* 3. High Golden Cirrus Clouds */}
+      {/* 3. High Celestial Cirrus Clouds (Delicate warm ivory) */}
       <group ref={highCloudsRef}>
         {highClouds.map((c, i) => (
           <sprite key={`high-${i}`} position={c.pos} scale={c.scale}>
@@ -125,7 +125,7 @@ export default function CloudLayer() {
               opacity={c.opacity}
               depthWrite={false}
               blending={THREE.NormalBlending}
-              color="#FDE047"
+              color="#FFF7ED"
             />
           </sprite>
         ))}
