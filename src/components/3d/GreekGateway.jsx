@@ -7,6 +7,7 @@ import {
   createGoldLeafTexture,
   createGreekMeanderTexture
 } from '../../utils/proceduralTextures';
+import PrometheanFlame from './PrometheanFlame';
 
 /**
  * GREEK GATEWAY - THE PROPYLAEA OF OLYMPUS
@@ -58,10 +59,6 @@ function FlutedColumn({ position, height = 22, radius = 0.85, marbleMat, goldMat
 }
 
 export default function GreekGateway() {
-  const leftFlameRef = useRef(null);
-  const rightFlameRef = useRef(null);
-  const leftLightRef = useRef(null);
-  const rightLightRef = useRef(null);
   const portalGlowRef = useRef(null);
 
   const marbleTex = useMemo(() => createMarbleTexture(512), []);
@@ -80,11 +77,11 @@ export default function GreekGateway() {
   const goldMat = useMemo(() => {
     return new THREE.MeshStandardMaterial({
       map: goldTex,
-      color: '#FDE047',
-      emissive: '#B45309',
-      emissiveIntensity: 0.25,
-      roughness: 0.2,
-      metalness: 0.92
+      color: '#C5A059',
+      emissive: '#78350F',
+      emissiveIntensity: 0.12,
+      roughness: 0.35,
+      metalness: 0.75
     });
   }, [goldTex]);
 
@@ -127,28 +124,11 @@ export default function GreekGateway() {
     return geo;
   }, []);
 
-  // Animate the eternal sacred flames and portal shimmering glow
+  // Animate the ethereal portal mist shimmering
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    const leftFlicker = 1.0 + Math.sin(t * 11.0) * 0.12 + Math.cos(t * 7.5) * 0.08;
-    const rightFlicker = 1.0 + Math.cos(t * 9.5) * 0.12 + Math.sin(t * 8.2) * 0.08;
-
-    if (leftFlameRef.current) {
-      leftFlameRef.current.scale.set(leftFlicker, leftFlicker * 1.25, leftFlicker);
-      leftFlameRef.current.rotation.y = t * 1.5;
-    }
-    if (rightFlameRef.current) {
-      rightFlameRef.current.scale.set(rightFlicker, rightFlicker * 1.25, rightFlicker);
-      rightFlameRef.current.rotation.y = -t * 1.5;
-    }
-    if (leftLightRef.current) {
-      leftLightRef.current.intensity = 45 * leftFlicker;
-    }
-    if (rightLightRef.current) {
-      rightLightRef.current.intensity = 45 * rightFlicker;
-    }
     if (portalGlowRef.current) {
-      portalGlowRef.current.material.opacity = 0.22 + Math.sin(t * 2.0) * 0.08;
+      portalGlowRef.current.material.opacity = 0.10 + Math.sin(t * 1.5) * 0.04;
     }
   });
 
@@ -328,20 +308,14 @@ export default function GreekGateway() {
         <mesh position={[0, 7.0, 0]} material={darkBronzeMat} castShadow>
           <cylinderGeometry args={[2.0, 0.9, 1.2, 16]} />
         </mesh>
-        {/* Glowing Sacred Flame */}
-        <mesh ref={leftFlameRef} position={[0, 8.2, 0]}>
-          <coneGeometry args={[0.9, 2.4, 8]} />
-          <meshBasicMaterial color="#FDE047" transparent opacity={0.92} />
-        </mesh>
-        {/* Dynamic Warm Flame Light */}
-        <pointLight
-          ref={leftLightRef}
-          position={[0, 8.5, 0]}
-          color="#F59E0B"
-          intensity={45}
-          distance={32}
-          decay={2}
-          castShadow
+        {/* Living Sacred Olympian Eternal Flame */}
+        <PrometheanFlame
+          position={[0, 7.4, 0]}
+          scale={1.2}
+          flameHeight={2.6}
+          flameRadius={0.9}
+          lightIntensity={48}
+          lightDistance={34}
         />
       </group>
 
@@ -355,31 +329,27 @@ export default function GreekGateway() {
         <mesh position={[0, 7.0, 0]} material={darkBronzeMat} castShadow>
           <cylinderGeometry args={[2.0, 0.9, 1.2, 16]} />
         </mesh>
-        {/* Glowing Sacred Flame */}
-        <mesh ref={rightFlameRef} position={[0, 8.2, 0]}>
-          <coneGeometry args={[0.9, 2.4, 8]} />
-          <meshBasicMaterial color="#FDE047" transparent opacity={0.92} />
-        </mesh>
-        {/* Dynamic Warm Flame Light */}
-        <pointLight
-          ref={rightLightRef}
-          position={[0, 8.5, 0]}
-          color="#F59E0B"
-          intensity={45}
-          distance={32}
-          decay={2}
-          castShadow
+        {/* Living Sacred Olympian Eternal Flame */}
+        <PrometheanFlame
+          position={[0, 7.4, 0]}
+          scale={1.2}
+          flameHeight={2.6}
+          flameRadius={0.9}
+          lightIntensity={48}
+          lightDistance={34}
         />
       </group>
 
-      {/* 8. Luminous Celestial Gateway Portal Beam */}
+      {/* 8. Luminous Celestial Gateway Portal Veil */}
       {/* Translucent divine veil that the camera flies straight through */}
       <mesh ref={portalGlowRef} position={[0, 13.5, 0]}>
         <planeGeometry args={[22, 24]} />
         <meshBasicMaterial
           color={CELESTIAL_THEME.sun.color}
           transparent
-          opacity={0.22}
+          opacity={0.10}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
           side={THREE.DoubleSide}
         />
       </mesh>
