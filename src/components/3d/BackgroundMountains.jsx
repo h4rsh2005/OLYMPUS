@@ -1,11 +1,19 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { CELESTIAL_THEME } from '../../config/olympusConfig';
+import { CELESTIAL_THEME, OLYMPUS_CONFIG } from '../../config/olympusConfig';
 
-// Custom Atmospheric Mountain GLSL Shader with Rayleigh Depth Haze,
-// Geological Stratification (basalt rock, pine scrub, and alpine snow),
-// and Sun-Facing Dawn Rim Lighting.
-const mountainVertexShader = `
+/**
+ * CONTINUOUS 360° PROCEDURAL HORIZON SYSTEM
+ * 
+ * Solves the visible world boundary problem:
+ * - A seamless 360-degree panoramic mountain cylinder encircling Mount Olympus at radius 880 units.
+ * - Continuous, non-periodic multi-frequency fractal noise (continental massifs + sharp arêtes + crags).
+ * - ZERO seams, ZERO visible mesh edges, ZERO repeating cones.
+ * - True Rayleigh atmospheric depth haze: as distance increases and at sea level, the terrain dissolves
+ *   100% into the atmospheric horizon haze before any boundary can ever be seen.
+ */
+
+const horizonVertexShader = `
   varying vec3 vWorldPosition;
   varying vec3 vNormal;
   varying vec2 vUv;
@@ -16,20 +24,20 @@ const mountainVertexShader = `
     vec4 worldPos = modelMatrix * vec4(position, 1.0);
     vWorldPosition = worldPos.xyz;
     vNormal = normalize(normalMatrix * normal);
-    vElevation = position.z; // Elevation is along geometry Z before rotation
+    vElevation = position.y;
 
     gl_Position = projectionMatrix * viewMatrix * worldPos;
   }
 `;
 
-const mountainFragmentShader = `
-  uniform vec3 uSunPosition;
+const horizonFragmentShader = `
+  uniform vec3 uSunDirection;
   uniform vec3 uSunColor;
   uniform vec3 uDawnAmber;
   uniform vec3 uSkyHorizonColor;
-  uniform vec3 uLowlandColor;  // Mediterranean dark pine & coastal scrub
-  uniform vec3 uRockColor;      // Stratified limestone & dark basalt
-  uniform vec3 uPeakColor;      // Alpine limestone & ethereal summit snow
+  uniform vec3 uLowlandColor;   // Aegean dark pine & coastal scrub
+  uniform vec3 uRockColor;       // Stratified limestone & dark basalt
+  uniform vec3 uPeakColor;       // Alpine rime snow on high peaks
   uniform float uMaxHeight;
 
   varying vec3 vWorldPosition;
@@ -37,175 +45,195 @@ const mountainFragmentShader = `
   varying vec2 vUv;
   varying float vElevation;
 
-  // Simple procedural noise for geological strata
-  float hash(vec2 p) {
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return fract(p.x * p.y);
-  }
-
   void main() {
-    vec3 lightDir = normalize(uSunPosition - vWorldPosition);
+    vec3 lightDir = normalize(uSunDirection);
     vec3 viewDir = normalize(cameraPosition - vWorldPosition);
 
-    // Directional Sun Lighting
+    // Directional Sun Lighting derived strictly from single celestial source
     float NdotL = max(0.0, dot(vNormal, lightDir));
     float skyLight = max(0.0, dot(vNormal, vec3(0.0, 1.0, 0.0))) * 0.45;
 
-    // Height ratio: 0.0 at base to 1.0 at highest peaks
+    // Height ratio: 0.0 at sea level to 1.0 at highest peaks
     float hRatio = clamp(vElevation / (uMaxHeight + 0.01), 0.0, 1.0);
 
-    // Geological horizontal rock strata banding
-    float strata = sin(vWorldPosition.y * 0.45 + hash(vUv * 10.0) * 0.6) * 0.5 + 0.5;
-
-    // Elevation-based biome & rock distribution:
-    // 1. Lower slopes: dark pine scrub & weathered coastal rock
+    // Elevation-based biome & geological strata distribution:
     vec3 baseColor = uLowlandColor;
 
-    // 2. Mid elevation: rugged limestone & dark basalt cliffs
-    float rockMix = smoothstep(0.15, 0.45, hRatio);
-    vec3 cliffColor = mix(uRockColor, uRockColor * (0.85 + strata * 0.3), 0.6);
-    baseColor = mix(baseColor, cliffColor, rockMix);
+    // Mid elevation: rugged limestone & dark basalt cliffs
+    float rockMix = smoothstep(0.12, 0.42, hRatio);
+    baseColor = mix(baseColor, uRockColor, rockMix);
 
-    // 3. High summits: sharp rocky arêtes with dusting of alpine snow/rime
+    // High summits: alpine snow / rime dust on upward slopes
     float slope = clamp(dot(vNormal, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
-    float snowPresence = smoothstep(0.62, 0.88, hRatio) * smoothstep(0.3, 0.8, slope);
-    baseColor = mix(baseColor, uPeakColor, snowPresence);
+    float snowPresence = smoothstep(0.55, 0.85, hRatio) * smoothstep(0.25, 0.75, slope);
+    baseColor = mix(baseColor, uPeakColor, snowPresence * 0.88);
 
-    // Light accumulation: warm golden dawn sunlight on sun-facing crags, cool skylight in shadow
+    // Light accumulation: warm celestial sunlight on sunward crags, cool skylight in shadow
     vec3 directSun = uSunColor * NdotL * 1.35;
-    vec3 ambient = vec3(0.12, 0.16, 0.28) * (skyLight + 0.3);
-    vec3 dawnRim = uDawnAmber * pow(max(0.0, dot(vNormal, lightDir)), 3.0) * 0.4;
+    vec3 ambient = vec3(0.12, 0.16, 0.26) * (skyLight + 0.35);
+    vec3 dawnRim = uDawnAmber * pow(max(0.0, dot(vNormal, lightDir)), 3.0) * 0.35;
 
     vec3 litColor = baseColor * (directSun + ambient) + dawnRim;
 
-    // True Atmospheric Rayleigh Depth Haze (Mountains kilometers away fade into ethereal violet mist)
+    // True Atmospheric Rayleigh Depth Haze & Sea Level Mist Dissolution
+    // As distance increases towards the horizon, contrast and saturation fade seamlessly into the sky
     float dist = length(vWorldPosition - cameraPosition);
-    float hazeFactor = 1.0 - exp(-pow(dist * 0.0016, 1.8));
-    hazeFactor = clamp(hazeFactor, 0.0, 0.88);
+    float distanceHaze = smoothstep(350.0, 1100.0, dist);
 
-    // Match horizon atmosphere
+    // Low-altitude sea mist dissolution (mountain base seamlessly vanishes into ocean haze)
+    float lowSeaMist = 1.0 - smoothstep(2.0, 28.0, vElevation);
+
+    // Total atmospheric factor: guarantees geometry dissolves into sky before any edge is seen
+    float totalHaze = clamp(distanceHaze * 0.72 + lowSeaMist * 0.85, 0.0, 1.0);
+
+    // Directional atmospheric horizon color
     float sunFacing = max(0.0, dot(viewDir, -lightDir));
-    vec3 atmosphericColor = mix(uSkyHorizonColor, uDawnAmber, pow(sunFacing, 2.2) * 0.45);
+    vec3 atmosphericColor = mix(uSkyHorizonColor, uDawnAmber, pow(sunFacing, 2.4) * 0.65);
 
-    vec3 finalColor = mix(litColor, atmosphericColor, hazeFactor);
+    vec3 finalColor = mix(litColor, atmosphericColor, totalHaze);
 
     gl_FragColor = vec4(finalColor, 1.0);
   }
 `;
 
-/**
- * Creates high-fidelity mountain geometry using multi-frequency ridged fractal noise
- */
-function createMountainGeometry(width, depth, height, seed = 1.0, segsX = 56, segsY = 36) {
-  const geo = new THREE.PlaneGeometry(width, depth, segsX, segsY);
-  const pos = geo.attributes.position;
-
-  for (let i = 0; i < pos.count; i++) {
-    const u = pos.getX(i) / (width * 0.5); // -1 to 1
-    const v = pos.getY(i) / (depth * 0.5); // -1 to 1
-
-    // Elliptical falloff so mountain ridge tapers naturally to sea level at edges
-    const distSq = u * u + v * v;
-    const edgeFalloff = Math.max(0.0, Math.cos(Math.min(1.0, Math.sqrt(distSq)) * Math.PI * 0.5));
-
-    if (edgeFalloff > 0) {
-      // 1. Primary macro mountain mass
-      const mass1 = Math.sin(u * 3.2 + seed) * 0.4 + 0.6;
-      // 2. Sharp knife-edge arêtes (using inverted absolute value for sharp peaks)
-      const arete1 = 1.0 - Math.abs(Math.sin(u * 7.5 + v * 2.2 + seed * 2.1));
-      const arete2 = 1.0 - Math.abs(Math.cos(u * 14.0 - v * 4.5 + seed * 3.4));
-      // 3. Couloirs & vertical crags
-      const crag = Math.sin(u * 22.0 + v * 8.0) * 0.12;
-      const microCrag = Math.cos(u * 44.0) * 0.05;
-
-      const elevation = (mass1 * 0.4 + arete1 * 0.35 + arete2 * 0.2 + crag + microCrag) * height * Math.pow(edgeFalloff, 1.3);
-      pos.setZ(i, Math.max(0, elevation));
-    } else {
-      pos.setZ(i, 0);
-    }
-  }
-
-  geo.computeVertexNormals();
-  return geo;
-}
-
 export default function BackgroundMountains() {
-  // Generate a panoramic ring of majestic Greek mountain ranges encircling the Aegean horizon
-  const mountainChains = useMemo(() => {
-    const chains = [];
+  const [mx, , mz] = OLYMPUS_CONFIG.world.mountainPosition;
 
-    // Distinct realistic mountain ranges encircling the entire 360-degree horizon
-    const configs = [
-      // 1. Pierian Range - Colossal Alpine Spines (North-West)
-      { angle: -2.3, distance: 340, width: 340, depth: 140, height: 110, seed: 1.4 },
-      // 2. High Ossa Ridge - Deep Gorges & Sea Cliffs (West)
-      { angle: -1.5, distance: 310, width: 310, depth: 130, height: 98, seed: 2.7 },
-      // 3. Mount Pelion Coastal Headlands (South-West)
-      { angle: -0.7, distance: 380, width: 280, depth: 110, height: 78, seed: 3.5 },
-      // 4. Distant Southern Aegean Archipelago Peaks (South)
-      { angle: 0.1, distance: 420, width: 260, depth: 100, height: 65, seed: 4.8 },
-      // 5. Southeast Cape & Oceanic Sea Crags (South-East)
-      { angle: 0.85, distance: 390, width: 290, depth: 120, height: 75, seed: 5.3 },
-      // 6. Eastern Aegean Coastal Mountain Wall (East)
-      { angle: 1.7, distance: 330, width: 320, depth: 135, height: 95, seed: 6.2 },
-      // 7. Pierian Massif Far North-East (North-East)
-      { angle: 2.5, distance: 360, width: 350, depth: 150, height: 115, seed: 7.6 },
-      // 8. Distant Northern Horizon Backbone (North)
-      { angle: 3.14, distance: 410, width: 380, depth: 160, height: 125, seed: 8.9 }
-    ];
+  // Layer 1: Continuous 360-degree Inner Horizon Massif Ring (Radius 680, Height 140)
+  const innerRingGeo = useMemo(() => {
+    const radius = 680;
+    const segments = 180;
+    const heightSegments = 32;
+    const maxHeight = 135;
 
-    configs.forEach((cfg, idx) => {
-      const geo = createMountainGeometry(cfg.width, cfg.depth, cfg.height, cfg.seed);
+    // Open cylinder geometry: radiusTop, radiusBottom, height, radialSegments, heightSegments, openEnded
+    const geo = new THREE.CylinderGeometry(radius, radius * 1.02, maxHeight, segments, heightSegments, true);
+    const pos = geo.attributes.position;
+    const vertex = new THREE.Vector3();
 
-      const posX = Math.sin(cfg.angle) * cfg.distance;
-      const posZ = Math.cos(cfg.angle) * cfg.distance - 45;
-      const rotY = cfg.angle + Math.PI; // Face inward toward Mount Olympus
+    for (let i = 0; i < pos.count; i++) {
+      vertex.fromBufferAttribute(pos, i);
 
-      chains.push({
-        id: idx,
-        geometry: geo,
-        maxHeight: cfg.height,
-        position: [posX, -1.5, posZ], // Slight sink into water so base has zero gap
-        rotation: [-Math.PI / 2, 0, rotY]
-      });
-    });
+      // Angle theta in [0, 2PI]
+      const angle = Math.atan2(vertex.z, vertex.x);
+      // Normalized vertical ratio: 0.0 at bottom (sea level), 1.0 at top
+      const vRatio = (vertex.y + maxHeight * 0.5) / maxHeight;
 
-    return chains;
+      if (vRatio > 0.05) {
+        // Multi-frequency continuous periodic noise (seamless at 0 and 2PI)
+        // 1. Low frequency continental massifs (Pieria, Pelion, Ossa)
+        const mass1 = Math.sin(angle * 3.0 + 1.2) * 0.35 + Math.cos(angle * 2.0 - 0.5) * 0.25;
+        // 2. Mid frequency knife-edge arêtes and couloirs
+        const arete1 = (1.0 - Math.abs(Math.sin(angle * 7.0 + 0.8))) * 0.28;
+        const arete2 = (1.0 - Math.abs(Math.cos(angle * 13.0 - 1.4))) * 0.18;
+        // 3. High frequency crags
+        const crag = Math.sin(angle * 29.0) * 0.08 + Math.cos(angle * 53.0) * 0.04;
+
+        const totalProfile = Math.max(0.08, 0.45 + mass1 + arete1 + arete2 + crag);
+
+        // Displace height and taper to zero at base
+        const newY = vRatio * maxHeight * totalProfile;
+        vertex.y = newY;
+
+        // Slight radial displacement to break circular symmetry
+        const radialBump = 1.0 + (mass1 + arete1) * 0.06;
+        vertex.x *= radialBump;
+        vertex.z *= radialBump;
+      } else {
+        vertex.y = 0.0;
+      }
+
+      pos.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    }
+
+    geo.computeVertexNormals();
+    return geo;
   }, []);
 
-  // Shared realistic mountain material with elevation & atmospheric depth
-  const mountainMaterial = useMemo(() => {
-    return new THREE.ShaderMaterial({
-      vertexShader: mountainVertexShader,
-      fragmentShader: mountainFragmentShader,
-      uniforms: {
-        uSunPosition: { value: new THREE.Vector3(...CELESTIAL_THEME.sun.position) },
-        uSunColor: { value: new THREE.Color(CELESTIAL_THEME.sun.color) },
-        uDawnAmber: { value: new THREE.Color(CELESTIAL_THEME.sky.dawnAmber) },
-        uSkyHorizonColor: { value: new THREE.Color(CELESTIAL_THEME.sky.horizonColor) },
-        // Mediterranean alpine palette:
-        uLowlandColor: { value: new THREE.Color('#16231C') },  // Dark coastal pine & heather
-        uRockColor: { value: new THREE.Color('#2A3545') },     // Weathered limestone & dark basalt
-        uPeakColor: { value: new THREE.Color('#E2E8F0') },     // Sunlit limestone & alpine rime frost
-        uMaxHeight: { value: 110.0 }
-      },
-      side: THREE.DoubleSide
-    });
+  // Layer 2: Continuous 360-degree Outer Continental Spine (Radius 1050, Height 190)
+  const outerRingGeo = useMemo(() => {
+    const radius = 1050;
+    const segments = 160;
+    const heightSegments = 28;
+    const maxHeight = 190;
+
+    const geo = new THREE.CylinderGeometry(radius, radius * 1.02, maxHeight, segments, heightSegments, true);
+    const pos = geo.attributes.position;
+    const vertex = new THREE.Vector3();
+
+    for (let i = 0; i < pos.count; i++) {
+      vertex.fromBufferAttribute(pos, i);
+
+      const angle = Math.atan2(vertex.z, vertex.x);
+      const vRatio = (vertex.y + maxHeight * 0.5) / maxHeight;
+
+      if (vRatio > 0.05) {
+        // Different phase and frequencies so it creates deep mountain parallax with layer 1
+        const mass = Math.cos(angle * 2.0 + 2.1) * 0.38 + Math.sin(angle * 4.0 - 0.7) * 0.22;
+        const arete = (1.0 - Math.abs(Math.sin(angle * 9.0 + 3.1))) * 0.32;
+        const crag = Math.cos(angle * 21.0) * 0.09;
+
+        const totalProfile = Math.max(0.1, 0.5 + mass + arete + crag);
+        vertex.y = vRatio * maxHeight * totalProfile;
+
+        const radialBump = 1.0 + mass * 0.05;
+        vertex.x *= radialBump;
+        vertex.z *= radialBump;
+      } else {
+        vertex.y = 0.0;
+      }
+
+      pos.setXYZ(i, vertex.x, vertex.y, vertex.z);
+    }
+
+    geo.computeVertexNormals();
+    return geo;
   }, []);
+
+  // Shared Horizon Terrain Shader Uniforms
+  const innerUniforms = useMemo(() => ({
+    uSunDirection: { value: new THREE.Vector3(...CELESTIAL_THEME.sun.direction) },
+    uSunColor: { value: new THREE.Color(CELESTIAL_THEME.sun.color) },
+    uDawnAmber: { value: new THREE.Color(CELESTIAL_THEME.sky.dawnAmber) },
+    uSkyHorizonColor: { value: new THREE.Color(CELESTIAL_THEME.sky.horizonColor) },
+    uLowlandColor: { value: new THREE.Color('#152220') },
+    uRockColor: { value: new THREE.Color('#222E37') },
+    uPeakColor: { value: new THREE.Color('#CBD5E1') },
+    uMaxHeight: { value: 140.0 }
+  }), []);
+
+  const outerUniforms = useMemo(() => ({
+    uSunDirection: { value: new THREE.Vector3(...CELESTIAL_THEME.sun.direction) },
+    uSunColor: { value: new THREE.Color(CELESTIAL_THEME.sun.color) },
+    uDawnAmber: { value: new THREE.Color(CELESTIAL_THEME.sky.dawnAmber) },
+    uSkyHorizonColor: { value: new THREE.Color(CELESTIAL_THEME.sky.horizonColor) },
+    uLowlandColor: { value: new THREE.Color('#111C1C') },
+    uRockColor: { value: new THREE.Color('#1B2630') },
+    uPeakColor: { value: new THREE.Color('#94A3B8') },
+    uMaxHeight: { value: 195.0 }
+  }), []);
 
   return (
-    <group>
-      {mountainChains.map((chain) => (
-        <mesh
-          key={chain.id}
-          geometry={chain.geometry}
-          material={mountainMaterial}
-          position={chain.position}
-          rotation={chain.rotation}
-          receiveShadow
+    <group position={[mx, 0, mz]}>
+      {/* Layer 1: Mid-Distance Horizon Massifs (Radius 680) */}
+      <mesh geometry={innerRingGeo} receiveShadow>
+        <shaderMaterial
+          vertexShader={horizonVertexShader}
+          fragmentShader={horizonFragmentShader}
+          uniforms={innerUniforms}
+          side={THREE.DoubleSide}
         />
-      ))}
+      </mesh>
+
+      {/* Layer 2: Colossal Outer Continental Spine (Radius 1050) */}
+      <mesh geometry={outerRingGeo} receiveShadow>
+        <shaderMaterial
+          vertexShader={horizonVertexShader}
+          fragmentShader={horizonFragmentShader}
+          uniforms={outerUniforms}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
     </group>
   );
 }

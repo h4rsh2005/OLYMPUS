@@ -136,7 +136,7 @@ export default function MountOlympus() {
 
     rockMat.onBeforeCompile = (shader) => {
       shader.uniforms.uSnowColor = { value: new THREE.Color('#F1F5F9') };
-      shader.uniforms.uSunDir = { value: new THREE.Vector3().fromArray(CELESTIAL_THEME.sun.position).normalize() };
+      shader.uniforms.uSunDir = { value: new THREE.Vector3().fromArray(CELESTIAL_THEME.sun.direction).normalize() };
       shader.uniforms.uSunWarmth = { value: new THREE.Color(CELESTIAL_THEME.sun.color) };
       shader.uniforms.uShadowFill = { value: new THREE.Color('#1E293B') }; // Aegean slate-blue shadow bounce
 

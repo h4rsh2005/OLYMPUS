@@ -2,9 +2,8 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { CELESTIAL_THEME } from '../../config/olympusConfig';
-import { createSunFlareTexture } from '../../utils/proceduralTextures';
 
-// Hyper-Realistic Sky Dome Shader with Rayleigh/Mie Scattering & Twinkling Celestial Stars
+// Physical Sky Dome Shader with Rayleigh/Mie Scattering & Twinkling Celestial Stars
 const skyVertexShader = `
   varying vec3 vWorldPosition;
   void main() {
@@ -20,7 +19,7 @@ const skyFragmentShader = `
   uniform vec3 uDawnAmber;
   uniform vec3 uSunColor;
   uniform vec3 uSunHaloColor;
-  uniform vec3 uSunPosition;
+  uniform vec3 uSunDirection;
   uniform float uTime;
   varying vec3 vWorldPosition;
 
@@ -51,22 +50,21 @@ const skyFragmentShader = `
       }
     }
 
-    // Solar Disc, Corona & God-Ray Atmospheric Scattering
-    vec3 sunDir = normalize(uSunPosition);
+    // Physical Solar Disc & Natural Atmospheric Mie Scattering
+    // Strictly uses the single source of truth sun direction vector
+    vec3 sunDir = normalize(uSunDirection);
     float sunDot = max(0.0, dot(point, sunDir));
 
     // Wide atmospheric golden wash
-    float sunWash = pow(sunDot, 4.0) * 0.45;
+    float sunWash = pow(sunDot, 4.0) * 0.40;
     // Radiant amber corona
-    float sunCorona = pow(sunDot, 28.0) * 0.95;
-    // Brilliant solar core
-    float sunCore = pow(sunDot, 320.0) * 4.5;
-    // Solar rays (subtle angular modulation)
-    float angle = atan(point.y - sunDir.y, point.x - sunDir.x);
-    float rayRings = sin(angle * 14.0 + uTime * 0.2) * 0.5 + 0.5;
-    float godRays = pow(sunDot, 12.0) * rayRings * 0.22;
+    float sunCorona = pow(sunDot, 28.0) * 0.85;
+    // Natural Mie forward-scattering haze (smooth and physical, NO artificial cross-lines)
+    float mieScatter = pow(sunDot, 72.0) * 0.35;
+    // Brilliant physical solar core
+    float sunCore = pow(sunDot, 480.0) * 5.0;
 
-    sky += uSunHaloColor * (sunWash + sunCorona + godRays);
+    sky += uSunHaloColor * (sunWash + sunCorona + mieScatter);
     sky += vec3(1.0, 0.98, 0.92) * sunCore;
 
     gl_FragColor = vec4(sky, 1.0);
@@ -75,8 +73,6 @@ const skyFragmentShader = `
 
 export default function Atmosphere() {
   const skyMeshRef = useRef(null);
-  const sunMeshRef = useRef(null);
-  const sunFlareTex = useMemo(() => createSunFlareTexture(256), []);
 
   const skyUniforms = useMemo(() => ({
     uTime: { value: 0 },
@@ -85,15 +81,16 @@ export default function Atmosphere() {
     uDawnAmber: { value: new THREE.Color('#E58E26') },
     uSunColor: { value: new THREE.Color(CELESTIAL_THEME.sun.color) },
     uSunHaloColor: { value: new THREE.Color(CELESTIAL_THEME.sun.haloColor) },
-    uSunPosition: { value: new THREE.Vector3(...CELESTIAL_THEME.sun.position) }
+    uSunDirection: { value: new THREE.Vector3(...CELESTIAL_THEME.sun.direction) }
   }), []);
 
-  useFrame((_, delta) => {
-    if (skyMeshRef.current && skyMeshRef.current.material) {
-      skyMeshRef.current.material.uniforms.uTime.value += delta;
-    }
-    if (sunMeshRef.current) {
-      sunMeshRef.current.rotation.z += delta * 0.05;
+  useFrame((state, delta) => {
+    if (skyMeshRef.current) {
+      if (skyMeshRef.current.material) {
+        skyMeshRef.current.material.uniforms.uTime.value += delta;
+      }
+      // Follow camera X/Z so the sky dome is truly infinite and impossible to reach or breach
+      skyMeshRef.current.position.set(state.camera.position.x, 0, state.camera.position.z);
     }
   });
 
@@ -102,12 +99,12 @@ export default function Atmosphere() {
       {/* 1. Atmospheric Fog */}
       <fogExp2
         attach="fog"
-        args={[CELESTIAL_THEME.sky.fogColor, CELESTIAL_THEME.sky.fogDensity * 0.85]}
+        args={[CELESTIAL_THEME.sky.fogColor, CELESTIAL_THEME.sky.fogDensity * 0.65]}
       />
 
-      {/* 2. Panoramic Sky Dome Sphere with Rayleigh/Mie & Starfield */}
+      {/* 2. Panoramic Sky Dome Sphere with Rayleigh/Mie & Starfield (Radius 3800) */}
       <mesh ref={skyMeshRef} scale={[-1, 1, 1]}>
-        <sphereGeometry args={[850, 48, 36]} />
+        <sphereGeometry args={[3800, 48, 36]} />
         <shaderMaterial
           vertexShader={skyVertexShader}
           fragmentShader={skyFragmentShader}
@@ -117,65 +114,68 @@ export default function Atmosphere() {
         />
       </mesh>
 
-      {/* 3. High-Fidelity Solar Disc with Lens Flare Corona Billboard */}
-      <group position={CELESTIAL_THEME.sun.position}>
-        {/* Blinding Solar Core */}
+      {/* 3. Physical Celestial Solar Body (No synthetic cross lines, purely physical celestial orb) */}
+      <group position={CELESTIAL_THEME.sun.visualPosition}>
+        {/* Brilliant Solar Photosphere Core */}
         <mesh>
-          <sphereGeometry args={[9, 32, 32]} />
-          <meshBasicMaterial color="#FFFFFF" />
+          <sphereGeometry args={[85, 32, 32]} />
+          <meshBasicMaterial color="#FFFBF0" />
         </mesh>
 
-        {/* Inner Golden Chromosphere */}
+        {/* Inner Golden Corona Halo */}
         <mesh>
-          <sphereGeometry args={[14, 32, 32]} />
+          <sphereGeometry args={[145, 32, 32]} />
           <meshBasicMaterial
-            color={CELESTIAL_THEME.sun.color}
+            color={CELESTIAL_THEME.sun.haloColor}
             transparent
-            opacity={0.7}
+            opacity={0.32}
+            side={THREE.DoubleSide}
           />
         </mesh>
 
-        {/* Outer Solar Flare Corona Billboard */}
-        <sprite ref={sunMeshRef} scale={[120, 120, 1]}>
-          <spriteMaterial
-            map={sunFlareTex}
+        {/* Outer Atmospheric Solar Wash */}
+        <mesh>
+          <sphereGeometry args={[260, 24, 24]} />
+          <meshBasicMaterial
+            color={CELESTIAL_THEME.sun.haloColor}
             transparent
-            opacity={0.88}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
+            opacity={0.12}
+            side={THREE.DoubleSide}
           />
-        </sprite>
+        </mesh>
       </group>
 
-      {/* 4. Directional Golden Sunlight Rig */}
-      <ambientLight color="#182338" intensity={0.8} />
+      {/* 4. Unified Celestial Lighting Rig Derived from the Exact Same Direction */}
+      <ambientLight color="#121D2F" intensity={0.65} />
 
+      {/* Celestial Sky & Aegean Ground Bounce */}
       <hemisphereLight
-        color="#38BDF8"
-        groundColor="#09182E"
-        intensity={0.75}
+        color={CELESTIAL_THEME.sun.skylightColor}
+        groundColor="#0A1422"
+        intensity={0.65}
       />
 
+      {/* Primary Directional Golden Sunlight (Positioned along exact Sun Direction Vector) */}
       <directionalLight
         position={CELESTIAL_THEME.sun.position}
         color={CELESTIAL_THEME.sun.color}
-        intensity={2.8}
+        intensity={CELESTIAL_THEME.sun.intensity}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={15}
-        shadow-camera-far={600}
-        shadow-camera-left={-160}
-        shadow-camera-right={160}
-        shadow-camera-top={160}
-        shadow-camera-bottom={-160}
-        shadow-bias={-0.0005}
+        shadow-camera-far={650}
+        shadow-camera-left={-180}
+        shadow-camera-right={180}
+        shadow-camera-top={180}
+        shadow-camera-bottom={-180}
+        shadow-bias={-0.0004}
       />
 
-      {/* Fill Light for Cliffs and Mountain Shadow Sides */}
+      {/* Environmental Fill: Soft Celestial Blue Bounce to reveal shadow details */}
       <directionalLight
-        position={[-80, 50, 60]}
-        color="#60A5FA"
+        position={[-CELESTIAL_THEME.sun.direction[0] * 180, 75, -CELESTIAL_THEME.sun.direction[2] * 180]}
+        color="#70A8DB"
         intensity={0.45}
       />
     </>

@@ -17,8 +17,9 @@ export default function FlythroughController({
 
   const animProgress = useRef({ t: 0 });
   const [isDone, setIsDone] = useState(false);
+  const isInteractingRef = useRef(false);
 
-  // 1. Build CatmullRomCurve3 for camera path and target look-at points
+  // 1. Build smooth CatmullRom curves for cinematic camera path and target look-at points
   const { pathCurve, targetCurve } = useMemo(() => {
     const posVectors = OLYMPUS_CONFIG.flythrough.positionWaypoints.map(
       (p) => new THREE.Vector3(p[0], p[1], p[2])
@@ -33,7 +34,7 @@ export default function FlythroughController({
     return { pathCurve: path, targetCurve: target };
   }, []);
 
-  // 2. Launch GSAP flythrough timeline
+  // 2. Launch GSAP flythrough timeline with smooth cinematic acceleration and deceleration
   useEffect(() => {
     animProgress.current.t = 0;
     setIsDone(false);
@@ -70,7 +71,7 @@ export default function FlythroughController({
     };
   }, [camera, pathCurve, targetCurve, onComplete, isReplaying]);
 
-  // 3. Frame update: Flythrough vs Free Orbit
+  // 3. Frame update: Flythrough motion vs subtle stationary camera breathing
   useFrame((state) => {
     const t = animProgress.current.t;
 
@@ -79,35 +80,48 @@ export default function FlythroughController({
       const currentPoint = pathCurve.getPointAt(t);
       const currentTarget = targetCurve.getPointAt(t);
 
-      // Dynamic FOV for acceleration feel
+      // Dynamic FOV for gentle cinematic acceleration feeling
       const fovElevation = Math.sin(t * Math.PI) * (OLYMPUS_CONFIG.flythrough.maxFOV - OLYMPUS_CONFIG.flythrough.baseFOV);
       camera.fov = OLYMPUS_CONFIG.flythrough.baseFOV + fovElevation;
       camera.updateProjectionMatrix();
 
       camera.position.copy(currentPoint);
       camera.lookAt(currentTarget);
+    } else if (controlsRef.current && !isInteractingRef.current) {
+      // Gentle, slow atmospheric camera breathing when idle at the summit
+      // Gives the impression of standing on high mountain thermals above the clouds
+      const clockTime = state.clock.elapsedTime;
+      const breathY = Math.sin(clockTime * 0.35) * 0.04;
+      const breathX = Math.cos(clockTime * 0.25) * 0.03;
+      camera.position.y += breathY * 0.1;
+      camera.position.x += breathX * 0.1;
     }
   });
 
   // Target sanctuary platform coordinates for OrbitControls
   const [, py, pz] = OLYMPUS_CONFIG.world.sanctuaryPlatform;
 
-  // Once flythrough is complete (or if user requested free controls), enable OrbitControls for full 360 drag
   return (
     <>
       <OrbitControls
         ref={controlsRef}
         enabled={isDone || freeControlsEnabled}
         enableDamping={true}
-        dampingFactor={0.06}
-        rotateSpeed={0.7}
-        zoomSpeed={0.85}
-        panSpeed={0.6}
-        minDistance={6}
-        maxDistance={280}
-        maxPolarAngle={Math.PI / 2 - 0.02} // Do not clip below water/ground
+        dampingFactor={0.045} // Silky physical weight and inertia
+        rotateSpeed={0.65}
+        zoomSpeed={0.8}
+        panSpeed={0.5}
+        minDistance={8}
+        maxDistance={240}
+        maxPolarAngle={Math.PI / 2 - 0.03} // Do not clip below water/ground
         minPolarAngle={0.08}
         target={[0, py + 1.5, pz]}
+        onStart={() => {
+          isInteractingRef.current = true;
+        }}
+        onEnd={() => {
+          isInteractingRef.current = false;
+        }}
       />
     </>
   );

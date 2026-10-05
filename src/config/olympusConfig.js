@@ -3,18 +3,44 @@
  * Shared single-source-of-truth constants used across Atmosphere, MountOlympus, Ocean, and Controllers.
  */
 
+// Celestial Sun Coordinates calculated from astronomical elevation & azimuth angles
+const SUN_ELEVATION_DEG = 36.0;   // 36° above the horizon (golden dawn / early morning)
+const SUN_AZIMUTH_DEG = 295.0;     // 295° azimuth (coming from west-northwest)
+
+const _elevRad = (SUN_ELEVATION_DEG * Math.PI) / 180;
+const _azimRad = (SUN_AZIMUTH_DEG * Math.PI) / 180;
+
+const _dirX = Math.cos(_elevRad) * Math.sin(_azimRad);
+const _dirY = Math.sin(_elevRad);
+const _dirZ = Math.cos(_elevRad) * Math.cos(_azimRad);
+
+// Normalized Sun Direction Vector (Points towards the Sun)
+const SUN_DIRECTION = [_dirX, _dirY, _dirZ];
+
 export const CELESTIAL_THEME = {
-  // Shared Sun & Light Parameters (Refined, natural celestial sunlight)
+  // Shared Single Source of Truth for Sun & Celestial Lighting
   sun: {
-    position: [45, 125, -120],
+    elevation: SUN_ELEVATION_DEG,
+    azimuth: SUN_AZIMUTH_DEG,
+    direction: SUN_DIRECTION,
+    // Distance 320 units for Shadow Casting Directional Light
+    position: [_dirX * 320, _dirY * 320, _dirZ * 320],
+    // Distance 3200 units for Visual Sun Disc inside Sky Dome
+    visualPosition: [_dirX * 3200, _dirY * 3200, _dirZ * 3200],
     color: "#FFF6E5",           // Natural warm celestial sunlight (not harsh yellow)
     colorHex: 0xFFF6E5,
     haloColor: "#FDE68A",       // Soft golden dawn halo
     haloColorHex: 0xFDE68A,
     skylightColor: "#7DD3FC",   // Ambient celestial blue skylight bounce
-    intensity: 2.1,
-    shaftOpacity: 0.28,
-    shaftAuraOpacity: 0.12,
+    intensity: 2.2,
+    shaftOpacity: 0.22,
+    shaftAuraOpacity: 0.10,
+  },
+
+  // Environmental Global Wind Vector (Influences eagles, clouds, water, vegetation)
+  wind: {
+    direction: [0.82, 0.04, -0.56],
+    speed: 1.35
   },
 
   // Atmospheric Sky & Depth Fog
